@@ -56,11 +56,47 @@ checks below.
    its emoji.
 3. Click it. The widget lands on the grid and its inspector opens.
 4. The **Content** (`Inhalt`) tab shows the settings the module's author defined
-   — a text box, a switch, a colour picker, whatever the manifest lists.
+   — a text box, a switch, a colour picker, whatever the manifest lists — and
+   a live preview of the module.
 5. Drag it into place, resize it, and click **Save**.
 
 Every display showing that view fetches the module's code and starts drawing it,
 within a second and without a reload.
+
+### Live preview in the inspector
+
+The preview uses the same widget renderer and module runtime as the display.
+Changes to the settings reach `ctx.config` immediately, before you click
+**Save**. The module keeps its React state while settings change; effects that
+depend on a setting should include it in their dependency list. Existing modules
+need no changes to render in the preview.
+
+The **Live** option reads real data through the usual `ctx.fetch` bridge,
+including Home Assistant read endpoints when that integration is configured.
+**Sample data** (`Beispieldaten`) sets `ctx.config.__demo` to `true`; a module
+only shows sample data if its author handles that flag. It does not invent Home
+Assistant states. Width and height controls resize the tile; connected-display
+buttons calculate its dimensions from the display and fit it into the inspector.
+Inherited fonts, colours and container-relative sizing work as on the display.
+
+The preview is not interactive: pointer and keyboard interaction inside the
+tile are disabled. `ctx.preview` is `true`, and `ctx.fetch` only allows `GET`
+and `HEAD`; other methods reject with a read-only error, including calls made
+from effects. The normal display remains interactive and has no such bridge
+restriction. Modules should use `ctx.fetch` for requests and clean up timers,
+subscriptions and listeners in their React effect cleanup functions.
+
+These protections are **not a sandbox**. A bundle still runs as trusted page
+code; direct `window.fetch`, other browser APIs and bundle-level side effects
+are outside the bridge's protection. Only preview modules you trust, and avoid
+actions during initialization or rendering.
+
+Bundles are shared by type for the lifetime of the page. After updating or
+re-uploading a module, reload the editor and any open displays to use its new
+code. There is no bundle hot reload. A failed download or registration can be
+retried by selecting another widget type and returning. Loading and render
+errors appear inside the preview; correcting a setting retries a render that
+failed because of that setting.
 
 ## Managing installed modules
 
@@ -225,9 +261,9 @@ translation layer.
 where it is and shows the error instead, which is why deleting asks first. Remove
 the widget from the view as well if you are done with it.
 
-**No live preview for community modules.** The **Content** tab of a built-in
-widget starts with a live preview of the real thing; for a module the inspector
-says so instead. You see the result by opening the view.
+The **Content** tab previews community modules as well as built-in widgets; see
+[Live preview in the inspector](#live-preview-in-the-inspector) for its read-only
+behaviour and bundle reload limitation.
 
 ## Where this lives in the code
 

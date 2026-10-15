@@ -72,14 +72,6 @@ export default function WidgetPreview({ type, config, bgOpacity, gridW = 12, gri
   const tileH = display ? Math.max(40, Math.round(display.height * (gridH / 24))) : 0;
   const scale = display && tileW > 0 ? Math.min(1, (availPx - 32) / tileW) : 1;
 
-  if (typeof type === "string" && type.startsWith("custom:")) {
-    return (
-      <p className="text-xs text-[var(--mf-fg)]/40 px-1 leading-relaxed">
-        {t("Für Community-Module gibt es hier noch keine Live-Vorschau.")}
-      </p>
-    );
-  }
-
   // ── Kachel-Hülle: 1:1 aus dem Live-View übernommen (siehe view/[id]) ──
   const isCardBased =
     type === "HomeAssistantWidget.tsx" ||
@@ -100,6 +92,7 @@ export default function WidgetPreview({ type, config, bgOpacity, gridW = 12, gri
   const tile = (w: number | string, h: number) => (
     <div
       className={`flex ${justifyClass} flex-col ${paddingClass} rounded-3xl overflow-hidden pointer-events-none select-none`}
+      inert={type.startsWith("custom:") ? true : undefined}
       style={{
         width: w,
         height: h,
@@ -124,7 +117,7 @@ export default function WidgetPreview({ type, config, bgOpacity, gridW = 12, gri
               : "none",
         }}
       >
-        {renderWidget(type, cfg, { dashboardId, onVisibilityChange: () => {} })}
+        {renderWidget(type, cfg, { dashboardId, onVisibilityChange: () => {}, preview: true })}
       </div>
     </div>
   );

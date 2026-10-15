@@ -26,6 +26,8 @@ export type ModuleCtx = {
   // Convenience: gibt das geparste config-Objekt zurück (passthrough)
   config: Record<string, any>;
   dashboardId?: string;
+  /** True in the inspector. Optional so existing module contexts stay compatible. */
+  preview?: boolean;
   // Helper für API-Calls aus dem Modul
   fetch: typeof fetch;
 };
@@ -84,54 +86,72 @@ export function ensureRuntime(): NonNullable<Window["MagicFrame"]> {
   return window.MagicFrame;
 }
 
-/** Lädt das Bundle eines Custom-Moduls (idempotent: kein zweites Script-Tag). */
+/** Loads each type once per page; concurrent tiles share the same request. */
 const loadedBundles = new Set<string>();
 const loadingBundles = new Map<string, Promise<void>>();
 
 export function loadModuleBundle(type: string): Promise<void> {
-  ensureRuntime();
+  const rt = ensureRuntime();
   if (loadedBundles.has(type)) return Promise.resolve();
   const inFlight = loadingBundles.get(type);
   if (inFlight) return inFlight;
   const p = new Promise<void>((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = `/api/modules/${encodeURIComponent(type)}/bundle.js?v=${Date.now()}`;
-    s.async = true;
-    s.onload = () => {
-      loadedBundles.add(type);
-      resolve();
+    const script = document.createElement("script");
+    let finished = false;
+    let registrationTimer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (error?: Error) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(downloadTimer);
+      clearTimeout(registrationTimer);
+      script.onload = script.onerror = null;
+      const callbacks = rt._loadCallbacks!.get(type)?.filter((cb) => cb !== registered);
+      if (callbacks?.length) rt._loadCallbacks!.set(type, callbacks);
+      else rt._loadCallbacks!.delete(type);
+      if (error) {
+        script.remove();
+        reject(error);
+      } else {
+        loadedBundles.add(type);
+        resolve();
+      }
     };
-    s.onerror = () => reject(new Error(`Konnte Custom-Modul ${type} nicht laden.`));
-    document.head.appendChild(s);
+    const registered = () => finish();
+    const downloadTimer = setTimeout(
+      () => finish(new Error(`Timeout: Custom-Modul ${type} konnte nicht geladen werden.`)),
+      15000,
+    );
+    script.src = `/api/modules/${encodeURIComponent(type)}/bundle.js?v=${Date.now()}`;
+    script.async = true;
+    script.onload = () => {
+      clearTimeout(downloadTimer);
+      if (rt._modules!.has(type)) return finish();
+      // Also allow modules that register asynchronously after the script loads.
+      const callbacks = rt._loadCallbacks!.get(type) ?? [];
+      callbacks.push(registered);
+      rt._loadCallbacks!.set(type, callbacks);
+      registrationTimer = setTimeout(
+        () => finish(new Error(`Timeout: Modul ${type} hat sich in 5000ms nicht registriert`)),
+        5000,
+      );
+    };
+    script.onerror = () => finish(new Error(`Konnte Custom-Modul ${type} nicht laden.`));
+    document.head.appendChild(script);
+  }).finally(() => {
+    loadingBundles.delete(type);
   });
   loadingBundles.set(type, p);
   return p;
 }
 
-/** Wartet bis das Modul in der Registry ist (Bundle hat sich registriert). */
-function waitForRegistration(type: string, timeoutMs = 5000): Promise<RegisteredModule> {
-  const rt = ensureRuntime();
-  const existing = rt._modules!.get(type);
-  if (existing) return Promise.resolve(existing);
-  return new Promise((resolve, reject) => {
-    const list = rt._loadCallbacks!.get(type) ?? [];
-    let done = false;
-    const cb = () => {
-      if (done) return;
-      done = true;
-      const m = rt._modules!.get(type);
-      if (m) resolve(m);
-      else reject(new Error(`Modul ${type} hat sich nicht registriert`));
-    };
-    list.push(cb);
-    rt._loadCallbacks!.set(type, list);
-    setTimeout(() => {
-      if (done) return;
-      done = true;
-      reject(new Error(`Timeout: Modul ${type} hat sich in ${timeoutMs}ms nicht registriert`));
-    }, timeoutMs);
-  });
-}
+/** Preview bridge calls are read-only, including Request objects and overrides. */
+const previewFetch: typeof fetch = async (input, init) => {
+  const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    throw new Error("Custom-module previews are read-only: " + method + " is disabled.");
+  }
+  return window.fetch(input, init);
+};
 
 /**
  * React-Wrapper für Custom-Module. Liegt im Live-View-Render an Stelle eines
@@ -177,15 +197,20 @@ function ModuleRenderer({
  * Render-Koerper und war von try/catch erreichbar.
  */
 class ModuleErrorBoundary extends React.Component<
-  { children: React.ReactNode },
+  { children: React.ReactNode; config: ModuleCtx["config"] },
   { message: string | null }
 > {
-  constructor(props: { children: React.ReactNode }) {
+  constructor(props: { children: React.ReactNode; config: ModuleCtx["config"] }) {
     super(props);
     this.state = { message: null };
   }
   static getDerivedStateFromError(e: any) {
     return { message: e?.message ?? String(e) };
+  }
+  componentDidUpdate(previous: Readonly<{ config: ModuleCtx["config"] }>) {
+    if (this.state.message && previous.config !== this.props.config) {
+      this.setState({ message: null });
+    }
   }
   render() {
     if (this.state.message) {
@@ -203,23 +228,29 @@ export function CustomWidget({
   type,
   config,
   dashboardId,
+  preview = false,
 }: {
   type: string;
   config?: Record<string, any>;
   dashboardId?: string;
+  preview?: boolean;
 }) {
-  const [mod, setMod] = React.useState<RegisteredModule | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [loaded, setLoaded] = React.useState<{
+    type: string;
+    mod?: RegisteredModule;
+    error?: string;
+  } | null>(null);
+  const mod = loaded?.type === type ? loaded.mod : undefined;
+  const error = loaded?.type === type ? loaded.error : undefined;
 
   React.useEffect(() => {
     let cancelled = false;
     loadModuleBundle(type)
-      .then(() => waitForRegistration(type))
-      .then((m) => {
-        if (!cancelled) setMod(m);
+      .then(() => {
+        if (!cancelled) setLoaded({ type, mod: ensureRuntime()._modules!.get(type) });
       })
       .catch((e) => {
-        if (!cancelled) setError(e?.message ?? String(e));
+        if (!cancelled) setLoaded({ type, error: e?.message ?? String(e) });
       });
     return () => {
       cancelled = true;
@@ -237,9 +268,12 @@ export function CustomWidget({
       useCallback: React.useCallback,
       config: config ?? {},
       dashboardId,
-      fetch: (typeof window !== "undefined" ? window.fetch.bind(window) : fetch) as typeof fetch,
+      preview,
+      fetch: preview
+        ? previewFetch
+        : (typeof window !== "undefined" ? window.fetch.bind(window) : fetch) as typeof fetch,
     }),
-    [config, dashboardId],
+    [config, dashboardId, preview],
   );
 
   if (error) {
@@ -257,7 +291,7 @@ export function CustomWidget({
     );
   }
   return (
-    <ModuleErrorBoundary key={type}>
+    <ModuleErrorBoundary key={type} config={ctx.config}>
       <ModuleRenderer render={mod.render} ctx={ctx} />
     </ModuleErrorBoundary>
   );

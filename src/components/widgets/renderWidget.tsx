@@ -28,6 +28,8 @@ import { CustomWidget } from "@/lib/modules/runtime";
 
 export type RenderWidgetOpts = {
   dashboardId?: string;
+  /** Read-only inspector preview; custom modules keep their display runtime. */
+  preview?: boolean;
   onVisibilityChange?: (isVisible: boolean) => void;
   /**
    * #41: der Live-View meldet hier, dass diese Kamera ins Vollbild soll. Er
@@ -77,7 +79,7 @@ export function renderWidget(type: string, config: any, opts: RenderWidgetOpts =
   // Custom-Module: type beginnt mit "custom:". Werden zur Laufzeit via
   // <script>-Tag-Injection geladen und rendern via window.MagicFrame-Bridge.
   if (typeof type === "string" && type.startsWith("custom:")) {
-    return <CustomWidget type={type} config={config} dashboardId={dashboardId} />;
+    return <CustomWidget key={type} type={type} config={config} dashboardId={dashboardId} preview={opts.preview} />;
   }
   return null;
 }
