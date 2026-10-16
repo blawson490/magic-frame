@@ -39,6 +39,12 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+      - name: Install browser for module regressions
+        run: npx playwright install --with-deps chromium
+
+      - name: Test custom-module fields and previews
+        run: npm run test:modules
+
       # Deliberately here and NOT in `npm run build`: somebody installing from
       # source must never have their install fail because our documentation
       # went stale. That is our problem to fix, not theirs to hit.

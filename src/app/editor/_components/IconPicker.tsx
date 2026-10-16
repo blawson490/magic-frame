@@ -114,6 +114,7 @@ export default function IconPicker({ value, onChange, placeholder, quickPicks, l
         </div>
         <input
           type="text"
+          aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder ?? "mdi:lightbulb"}

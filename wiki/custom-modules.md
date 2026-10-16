@@ -159,6 +159,8 @@ Each entry in `fields` becomes one control in the widget's inspector:
 | `boolean` | A checkbox |
 | `color` | A colour picker with a `#rrggbb` box beside it, and a `×` to clear it |
 | `url` | A single-line box the browser checks for a web address |
+| `ha-entity` | A Home Assistant entity picker; stores one entity ID string, or `""` when cleared |
+| `ha-entities` | An ordered list of Home Assistant entities, with add, remove, reorder and expandable display settings; stores an array, or `[]` when cleared |
 
 Anything else — a misspelled type, a type the author invented — falls back to a
 plain text box rather than being refused.
@@ -174,6 +176,67 @@ and nothing warns you. Whether the module copes is up to its author.
 language setting; a module's labels and help text are printed exactly as its
 author wrote them. A module written in German stays German on an English
 installation, and the reverse.
+
+### Home Assistant field options and values
+
+These types require a Magic Frame release that supports them. Older hosts turn
+unknown types into text boxes; structured lists cannot be edited correctly there.
+There is no separate runtime version requirement or automatic conversion of old
+comma-separated settings.
+
+```js
+fields: [
+  { key: "primaryEntity", label: "Primary entity", type: "ha-entity",
+    domains: ["sensor"], default: "", placeholder: "sensor.room_temperature" },
+  { key: "entities", label: "Entities", type: "ha-entities",
+    domains: ["sensor", "binary_sensor"],
+    itemFields: ["name", "color", "unit", "icon"], default: [] },
+]
+```
+
+| Option | Applies to | Meaning |
+| --- | --- | --- |
+| `domains` | Both types | Optional array of nonempty domain strings. Omitted or `[]` suggests all domains. Filters suggestions, not access permissions or manually typed IDs. |
+| `itemFields` | `ha-entities` | Optional array containing `name`, `color`, `unit`, `icon`. Omitted shows all four; `[]` shows entity selection only. The host chooses control order. Hiding controls does not delete saved overrides. |
+| `default` | Both types | An entity ID string for `ha-entity`; an array of entries for `ha-entities`. The runtime passes config through without filling missing defaults; module authors must also apply their declared fallback. |
+
+Entity selection is always present in each list entry. Host list controls are
+translated; manifest labels/help are not. `required` remains informational.
+
+The module receives values like these, unchanged, in `ctx.config`:
+
+```js
+{
+  primaryEntity: "sensor.room_temperature",
+  entities: [
+    { entityId: "sensor.room_temperature", label: "Room", color: "#14b8a6",
+      icon: "mdi:thermometer", unit: "°C" },
+    { entityId: "binary_sensor.front_door" },
+    { entityId: "" }, // unfinished draft: skip it
+  ],
+}
+```
+
+- Every entry requires a string `entityId`; blank drafts are allowed. Skip blank
+  IDs rather than discovering replacements. Order is display order; duplicate
+  IDs are allowed and may have different overrides.
+- `label`, `icon`, `color` and `unit` are optional string overrides. The `name`
+  control stores `label`, not `name`. Blank names fall back to HA's friendly
+  name, then the entity ID. Missing icon/color uses the module's own defaults,
+  optionally including HA metadata; the host does not resolve them.
+- Unit has an Auto/custom selector: missing `unit` means Auto (use HA metadata);
+  a string is custom, including `unit: ""` to hide the unit. Returning to Auto
+  removes the override. Omit absent overrides rather than storing `null` or
+  `undefined`.
+- A missing list uses the declared default, or `[]` if none exists. An explicit
+  `[]` is empty even when the default is nonempty. Empty lists must show an empty
+  state, not fetch or render all HA entities.
+
+These are **display overrides only**: they do not change HA names, states or
+metadata. Pickers may load the entity catalog for suggestions, but modules must
+fetch their own selected state data. There is no host-managed fetching,
+subscription or implicit discovery. See the [author walkthrough](module-development.md#home-assistant-selections)
+and `examples/modules/ha-entities/` for a working implementation.
 
 ## The type id starts with `custom:`
 
@@ -227,13 +290,15 @@ It **can**:
   `useEffect`, `useRef`, `useMemo` and `useCallback`;
 - read its own settings, as you filled them in;
 - know which view it is running on;
+- offer Home Assistant entity pickers and per-entry name, colour, unit and icon
+  overrides through the manifest;
 - fetch data from anywhere the display's browser can reach.
 
 It **cannot**:
 
 - run anything on the server — a module is browser code only;
-- add settings beyond the six field types above, so no entity picker, no icon
-  picker, no album chooser like the built-in widgets have;
+- add arbitrary editor controls beyond the field types above, such as an album
+  chooser, or import the host's internal editor components;
 - use anything other than an emoji as its icon;
 - change the shared **Layout** and **Text & colour** tabs. Those work on a module
   exactly as on any other widget: font, colour, shadow, background opacity,

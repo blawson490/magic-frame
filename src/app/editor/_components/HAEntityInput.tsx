@@ -11,6 +11,7 @@ type Entity = {
 };
 
 type Props = {
+  id?: string;
   value: string;
   onChange: (entityId: string) => void;
   /** Optional list of domains to restrict suggestions to — e.g. ["light", "switch"]. */
@@ -52,6 +53,7 @@ async function loadAllEntities(): Promise<Entity[]> {
 }
 
 export default function HAEntityInput({
+  id,
   value,
   onChange,
   domains,
@@ -148,6 +150,7 @@ export default function HAEntityInput({
   return (
     <div ref={containerRef} className="relative">
       <input
+        id={id}
         ref={inputRef}
         type="text"
         value={query}

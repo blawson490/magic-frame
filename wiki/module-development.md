@@ -60,7 +60,7 @@ A complete working version of the same idea ships with Magic Frame, in
 field, and German labels. Copy it and change it; it is shorter than reading
 about it.
 
-The manifest fields, the six settings types, and the rules Magic Frame enforces
+The manifest fields, the settings types, and the rules Magic Frame enforces
 on upload are documented once in [Custom modules](custom-modules.md); this page
 does not repeat them.
 
@@ -72,14 +72,63 @@ Your `render` function is called with one argument and can reach nothing else:
 | --- | --- |
 | `createElement`, `Fragment` | React's own, so you can build elements without importing React |
 | `useState`, `useEffect`, `useRef`, `useMemo`, `useCallback` | The five React hooks, bound to the host's React |
-| `config` | Your settings, as the user filled them in. Always an object. |
+| `config` | Your settings, as the user filled them in. Always an object; passed through without hydrating missing manifest defaults. |
 | `dashboardId` | Which view the widget is running on. Useful for asking for that view's timers or messages. |
-| `fetch` | The browser's `fetch`, so you can call an API — including Magic Frame's own routes such as `/api/weather`. |
+| `fetch` | The fetch bridge for APIs including `/api/weather`; restricted to GET/HEAD in inspector previews. |
+| `preview` | `true` in the read-only inspector preview. Sample-data mode separately sets `config.__demo` to `true`. |
 
 **Do not import React yourself.** It would be bundled into your file and you
 would end up with a second copy of React running beside the host's, which breaks
 hooks in ways that are miserable to debug. That is the entire reason the hooks
 arrive on `ctx`.
+
+### Home Assistant selections
+
+Declare `ha-entity` for one ID string and `ha-entities` for an ordered entry
+array. The [canonical field reference](custom-modules.md#home-assistant-field-options-and-values)
+defines `domains`, `itemFields`, defaults and override semantics. Start with the
+original working example in `examples/modules/ha-entities/ha-entities.js`:
+
+```js
+fields: [
+  { key: "primaryEntity", label: "Featured entity", type: "ha-entity", default: "" },
+  { key: "entities", label: "Entities", type: "ha-entities",
+    itemFields: ["name", "color", "unit", "icon"], default: [] },
+]
+```
+
+1. Read `ctx.config.primaryEntity` and `ctx.config.entities`. Implement missing
+   defaults in your bundle too: the runtime does not hydrate them. Preserve an
+   explicit empty array; never use an empty selection as a discovery request.
+2. Skip entries whose required string `entityId` is blank. Keep display order
+   and duplicates, but deduplicate IDs before fetching.
+3. Use `ctx.fetch("/api/ha/state?ids=" + encodeURIComponent(ids.join(",")))`
+   only when there are selected IDs. This GET route accepts comma-separated
+   `ids` (or one `entityId`) and returns an object keyed by entity ID, each value
+   an HA state object with `state` and `attributes`. Unreadable/missing entities
+   are omitted. Check HTTP errors too: unconfigured HA returns 400. Do not use
+   the catalog endpoint as widget content or assume a `/states` proxy exists.
+4. Resolve display settings yourself: `entry.label || attributes.friendly_name
+   || entry.entityId`, optional icon/color defaults, and
+   `typeof entry.unit === "string" ? entry.unit : attributes.unit_of_measurement`.
+   The `name` control stores `label`. Do not use `entry.unit || ...`, because an
+   intentionally empty custom unit hides the unit. These settings never modify HA.
+5. Fetch in an effect keyed by selected IDs, clean up requests and timers when
+   they change, and handle unavailable/unknown or missing entities. Use
+   `ctx.config.__demo` for local sample data without fetching; do not invent
+   selections when the list is empty. GET-only reads also work in read-only
+   preview; do not perform actions during initialization.
+
+Build the example without adding generated files to the checkout:
+
+```bash
+node scripts/build-module.mjs examples/modules/ha-entities/ha-entities.js /tmp/opencode/ha-entities
+```
+
+Upload the resulting `module.json` and `bundle.js` at `/editor/modules`. It
+demonstrates both selectors, local sample states, display overrides and polling
+only selected IDs. A supporting host release is required; older hosts fall back
+to text controls and cannot edit the structured array correctly.
 
 ### Sizes go in `em`
 
