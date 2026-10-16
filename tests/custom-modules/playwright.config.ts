@@ -3,7 +3,7 @@ import path from "node:path";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "preview.spec.mjs",
+  testMatch: "*.spec.mjs",
   workers: 1,
   use: {
     baseURL: "http://127.0.0.1:3177",

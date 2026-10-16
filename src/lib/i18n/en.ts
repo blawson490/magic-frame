@@ -2,6 +2,13 @@
 // Fehlt ein Key, fällt useT() automatisch auf Deutsch zurück (nichts bricht).
 
 export const EN: Record<string, string> = {
+  "Entity-ID": "Entity ID",
+  "Einheit": "Unit",
+  "Einheitenmodus": "Unit mode",
+  "Benutzerdefinierte Einheit": "Custom unit",
+  "Benutzerdefiniert": "Custom",
+  "Ungültige Entity-Liste. Gespeicherte Daten bleiben unverändert.": "Invalid entity list. Saved data is unchanged.",
+  "Ungültige Entity-ID. Gespeicherte Daten bleiben unverändert.": "Invalid entity ID. Saved data is unchanged.",
   // ── Navigation / Layout ──
   "Dashboard": "Dashboard",
   "Views": "Views",

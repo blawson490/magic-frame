@@ -3,28 +3,21 @@
 import { useEffect, useState } from "react";
 import type { WidgetLayoutItem } from "../_types";
 import { useT } from "@/lib/i18n/LocaleProvider";
-
-type Field = {
-  key: string;
-  label: string;
-  type: "text" | "textarea" | "number" | "boolean" | "color" | "url";
-  default?: any;
-  placeholder?: string;
-  help?: string;
-  required?: boolean;
-};
+import { isEntityList, type ModuleManifestField } from "@/lib/modules/manifest";
+import HAEntityInput from "../_components/HAEntityInput";
+import EntityListEditor from "../_components/EntityListEditor";
 
 type ModuleDescriptor = {
   type: string;
   label: string;
   iconEmoji: string;
   description?: string;
-  fields: Field[];
+  fields: ModuleManifestField[];
 };
 
 type Props = {
   widget: WidgetLayoutItem;
-  updateConfig: (i: string, key: string, value: any) => void;
+  updateConfig: (i: string, key: string, value: unknown) => void;
 };
 
 /**
@@ -35,35 +28,40 @@ type Props = {
 export default function CustomModuleInspector({ widget, updateConfig }: Props) {
   const t = useT();
   const [mod, setMod] = useState<ModuleDescriptor | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ type: string; message: string } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/modules", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
-        const found = (d.modules ?? []).find((m: any) => m.type === widget.type);
+        if (cancelled) return;
+        const found = (d.modules ?? []).find((m: ModuleDescriptor) => m.type === widget.type);
         if (found) {
           setMod(found);
           setError(null);
         } else {
-          setError(t("Modul '{x}' nicht gefunden. Eventuell wurde es gelöscht oder deaktiviert.").replace("{x}", widget.type));
+          setError({ type: widget.type, message: t("Modul '{x}' nicht gefunden. Eventuell wurde es gelöscht oder deaktiviert.").replace("{x}", widget.type) });
         }
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => { if (!cancelled) setError({ type: widget.type, message: e.message }); });
+    return () => { cancelled = true; };
   }, [widget.type, t]);
 
-  if (error) {
+  if (error?.type === widget.type) {
     return (
       <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-        {error}
+        {error.message}
       </div>
     );
   }
-  if (!mod) {
+  if (!mod || mod.type !== widget.type) {
     return <div className="text-sm text-[var(--mf-fg)]/40">{t("Lade…")}</div>;
   }
 
-  const config = (widget.config as any) ?? {};
+  // Legacy primitive controls accept the module's historically free-form config.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const config: Record<string, any> = widget.config ?? {};
 
   return (
     <div className="space-y-4">
@@ -82,14 +80,26 @@ export default function CustomModuleInspector({ widget, updateConfig }: Props) {
         </p>
       ) : (
         mod.fields.map((f) => {
-          const v = config[f.key] ?? f.default ?? "";
+          const isHA = f.type === "ha-entity" || f.type === "ha-entities";
+          const v = isHA && Object.hasOwn(config, f.key) ? config[f.key]
+            : config[f.key] ?? f.default ?? (f.type === "ha-entities" ? [] : "");
+          const inputId = `${widget.i}-${f.key}`;
           return (
             <div key={f.key}>
-              <label className="text-sm font-medium text-[var(--mf-fg)]/80 block mb-2">
+              <label htmlFor={f.type === "ha-entity" ? inputId : undefined} className="text-sm font-medium text-[var(--mf-fg)]/80 block mb-2">
                 {f.label}
                 {f.required ? "" : <span className="text-[var(--mf-fg)]/40 text-xs"> ({t("optional")})</span>}
               </label>
-              {f.type === "textarea" ? (
+              {f.type === "ha-entities" ? (
+                isEntityList(v) ? <EntityListEditor key={`${widget.i}-${f.key}`} value={v}
+                  onChange={next => updateConfig(widget.i, f.key, next)} domains={f.domains}
+                  itemFields={f.itemFields} placeholder={f.placeholder} />
+                  : <p role="alert" className="text-sm text-red-400">{t("Ungültige Entity-Liste. Gespeicherte Daten bleiben unverändert.")}</p>
+              ) : f.type === "ha-entity" ? (
+                typeof v === "string" ? <HAEntityInput id={inputId} value={v} domains={f.domains} clearable
+                  onChange={next => updateConfig(widget.i, f.key, next)} placeholder={f.placeholder} />
+                  : <p role="alert" className="text-sm text-red-400">{t("Ungültige Entity-ID. Gespeicherte Daten bleiben unverändert.")}</p>
+              ) : f.type === "textarea" ? (
                 <textarea
                   value={v}
                   onChange={(e) => updateConfig(widget.i, f.key, e.target.value)}

@@ -1,4 +1,5 @@
 "use client";
+import { moduleFieldDefaults, type ModuleManifestField } from "@/lib/modules/manifest";
 
 import React, { useState, useEffect, useRef, use } from "react";
 import { Responsive, WidthProvider } from "react-grid-layout/legacy";
@@ -448,7 +449,7 @@ export default function ViewEditor({
       type: string;
       label: string;
       iconEmoji: string;
-      fields: Array<{ key: string; label: string; type: string; default?: any; placeholder?: string; help?: string; required?: boolean }>;
+      fields: ModuleManifestField[];
     }>
   >([]);
   useEffect(() => {
@@ -676,9 +677,7 @@ export default function ViewEditor({
       const mod = customModules.find((m) => m.type === type);
       if (mod) {
         label = mod.label;
-        for (const f of mod.fields ?? []) {
-          if (f.default !== undefined) initialConfig[f.key] = f.default;
-        }
+        Object.assign(initialConfig, moduleFieldDefaults(mod.fields ?? []));
       }
     }
 

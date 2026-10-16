@@ -3,6 +3,7 @@
     "width": 1280,
     "height": 800
   },
+  "nonvisualRevalidation": "Custom-module HA fields: the four view-editor screenshots retain their existing pixels. Their page.tsx fingerprints were revalidated after review because only a manifest type import and cloned widget-default initialization changed, not the pictured layout, palette, or toolbar. Inspector changes are covered separately by browser tests.",
   "note": "Every shot records the source files it shows. check-wiki.mjs fails when one of them changed after takenAt — retake with: node scripts/shoot-wiki.mjs <id>. Shots are taken against a seeded throwaway instance with invented content (scripts/seed-demo.mjs plus the two stubs), never against a real household.",
   "shots": [
     {
@@ -598,7 +599,7 @@
         }
       ],
       "takenAt": {
-        "src/app/editor/(app)/views/[id]/page.tsx": "e8d40f4a8206"
+        "src/app/editor/(app)/views/[id]/page.tsx": "8c7ae88cf191"
       }
     },
     {
@@ -622,7 +623,7 @@
       ],
       "takenAt": {
         "src/app/editor/_components/AddWidgetModal.tsx": "1f09b0ab6467",
-        "src/app/editor/(app)/views/[id]/page.tsx": "e8d40f4a8206"
+        "src/app/editor/(app)/views/[id]/page.tsx": "8c7ae88cf191"
       }
     },
     {
@@ -1126,7 +1127,7 @@
         }
       ],
       "takenAt": {
-        "src/app/editor/(app)/views/[id]/page.tsx": "e8d40f4a8206"
+        "src/app/editor/(app)/views/[id]/page.tsx": "8c7ae88cf191"
       }
     },
     {
@@ -1151,7 +1152,7 @@
         }
       ],
       "takenAt": {
-        "src/app/editor/(app)/views/[id]/page.tsx": "e8d40f4a8206"
+        "src/app/editor/(app)/views/[id]/page.tsx": "8c7ae88cf191"
       }
     },
     {

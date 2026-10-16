@@ -32,6 +32,7 @@ export default function AccordionCard({
       <div className="flex items-center gap-2 p-3">
         <button
           type="button"
+          aria-expanded={open}
           onClick={onToggle}
           className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
         >
@@ -50,6 +51,7 @@ export default function AccordionCard({
         {headerExtra}
         {onDelete && (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onDelete();

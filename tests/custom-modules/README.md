@@ -22,3 +22,11 @@ sizing, script deduplication, failed initialization and render recovery. They do
 not establish connectivity to a real Home Assistant installation or validate
 database-backed module upload. Run the normal TypeScript/build checks and a
 configured application's upload/HA smoke checks separately.
+
+## HA field coverage
+
+`npm run test:modules` includes preview-runtime regressions, pure manifest parsing
+and default-cloning checks, and the shared/custom HA entity editor controls.
+The HA example is exercised with stubbed selected-state responses (including no
+requests for an empty selection); no real Home Assistant or database is needed.
+For a locally installed Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
