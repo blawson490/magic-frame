@@ -1,7 +1,8 @@
 # Plan: Home Assistant fields for custom modules
 
-Status: implemented on `feature/custom-module-ha-fields`; awaiting authenticated
-GitHub publication/merge and user QA.
+Status: implemented on `feature/custom-module-ha-fields`; local Docker QA chosen
+while GitHub authentication is unavailable. Publication/merge remains pending.
+See [the local QA runbook](custom-module-ha-fields-qa.md).
 
 Suggested implementation branch: `feature/custom-module-ha-fields`.
 
