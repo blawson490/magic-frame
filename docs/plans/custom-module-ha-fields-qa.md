@@ -76,6 +76,13 @@ temporary first-run instance publicly or reuse a production password.
 
 ## Test the feature
 
+For a purpose-built, guided QA module, use
+[`HA Field Lab`](../../examples/modules/ha-fields-qa/README.md). It starts with
+offline sample data, renders visible pills/icons, exposes full/limited/entity-only
+lists, and includes a detailed pass/fail checklist. Its upload files are built to
+`/tmp/opencode/ha-fields-qa-module/`. The original minimal example below remains
+available for testing the smaller authoring walkthrough.
+
 1. In the server's source checkout, build the original example:
 
    ```sh
